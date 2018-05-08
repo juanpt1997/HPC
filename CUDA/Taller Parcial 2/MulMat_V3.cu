@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cuda.h>
-#define TILE_DIM 4
+#define TILE_DIM 32
 
 __global__ void MulMatriz(float *m1, float *m2, float *mr, int fil1, int col1,int fil2, int col2) {
 	
@@ -11,10 +11,55 @@ __global__ void MulMatriz(float *m1, float *m2, float *mr, int fil1, int col1,in
 	
 	int valor = 0;
 
+
+	int bx = blockIdx.x;
+  	int by = blockIdx.y;
+  	int tx = threadIdx.x;
+	int ty = threadIdx.y;
+	int gx = gridDim.x;
+	int gy = gridDim.y;
+
 	__shared__ float m1s[TILE_DIM][TILE_DIM];
     __shared__ float m2s[TILE_DIM][TILE_DIM];
 
-    for (int k = 0; k < (TILE_DIM + col1 - 1)/TILE_DIM; k++) {
+
+    int n = 0, m = 0;
+    while(m < gx && n < gy){
+		/* De A queremos sacar las columnas, por eso:
+		* j = ( ( m * TILE_DIM ) + tx )
+		* j = ( ( bx * TILE_DIM ) + tx )
+		* Hacemos la comparación entre ambas.
+		* Vemos que m se mueve entre los bloques en el eje x (las columnas)
+		*/
+		if(( ( m * TILE_DIM ) + tx ) < col1 && i < fil1) //Si no se pasa
+			m1s[ty][tx] = m1[ (i * col1) + ( ( m * TILE_DIM ) + tx )];//(i*col1 + k), donde k-> 0..fil2 (fil2 = col1)
+		else m1s[ty][tx] = 0;
+
+		/* De B queremos sacar las filas, por eso:
+		* i = ( ( m * TILE_DIM ) + tx )
+		* i = ( ( by * TILE_DIM ) + tx )
+		* Hacemos la comparación entre ambas.
+		* Vemos que n se mueve entre los bloques en el eje y (las filas)
+		*/
+		if(( n * TILE_DIM + ty) < fil2 && j < col2)
+			m2s[ty][tx] = m2[( ( n * TILE_DIM + ty) * col2 ) + j ];//(k*col2)+Col, donde k-> 0..fil2
+		else m2s[ty][tx] = 0;
+
+		m++; n++;
+
+		__syncthreads();//espera a todos los hilos
+
+		for (int k=0; k < TILE_DIM ; ++k) {
+			valor += m1s[ty][k] * m2s[k][tx];
+		}
+		__syncthreads();
+	}
+	if(i < fil1 && j < col2)
+		mr[ (i * col2) + j] = valor; //C[filA][col2]
+
+
+
+    /*for (int k = 0; k < (TILE_DIM + col1 - 1)/TILE_DIM; k++) {
     	
     	if (k*TILE_DIM + threadIdx.x < col1 && i < fil1){
         	m1s[threadIdx.y][threadIdx.x] = m1[i*col1 + k*TILE_DIM + threadIdx.x];
@@ -38,7 +83,9 @@ __global__ void MulMatriz(float *m1, float *m2, float *mr, int fil1, int col1,in
 
     if (i < fil1 && j < col2){
         mr[((blockIdx.y * blockDim.y + threadIdx.y)*col2) + (blockIdx.x * blockDim.x)+ threadIdx.x] = valor;
-    }
+    }*/
+
+
 }
 
 
