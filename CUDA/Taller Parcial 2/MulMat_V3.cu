@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cuda.h>
-#define TILE_DIM 128
+#define TILE_DIM 90
 
 __global__ void MulMatriz(float *m1, float *m2, float *mr, int fil1, int col1,int fil2, int col2) {
 	
