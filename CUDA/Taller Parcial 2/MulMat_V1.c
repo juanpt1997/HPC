@@ -2,152 +2,94 @@
 #include <stdlib.h>
 #include <time.h>
 
-void escribirCSV(int fil, int col, float **m) 
-{ 
-	FILE *f = fopen("Matrices.csv", "a"); 
+void EscribirMatriz(int fil, int col, float *m) { 
+	FILE *f = fopen("outputSecuencial.txt", "a"); 
 	for(int i=0; i<fil; i++){
-		for(int j=0; j<col-1; j++){
-			fprintf(f,"%f,", m[i][j]);
+		for(int j=0; j<col; j++){
+			if(j==col-1){
+				fprintf(f,"%f\n", m[i*col+j]); 
+			}
+			else{
+				fprintf(f,"%f,", m[i*col+j]);
+			}
 		}
-		fprintf(f,"%f\n", m[i][col-1]); 
 	}
 	fprintf(f, "\n");
   	fclose(f); 
-} 
-
-
-
-float** MulMatrices(float **m1, float **m2, int fil, int col, int fil2){
-
-	float** mr;
-	mr = (float **)malloc (fil*sizeof(float *));
-	for (int i=0; i<fil; i++)
-		mr[i] = (float *) malloc (col*sizeof(float));
-
-	for(int i=0; i<fil; i++){
-    	for(int j=0; j<col; j++){
-        	mr[i][j]=0;
-        	for(int k=0; k<fil2; k++){
-            	mr[i][j]+=m1[i][k]*m2[k][j];
-        	}
-    	}
-	}	
-	return mr;
 }
 
-void llenarMatrices(){
 
-	int fil1, col1, fil2, col2;
-	float** m1;
-	float** m2;
-	float** mr;
+void LeerMatriz(float* m1, float* m2, FILE* file, int fil1, int fil2, int col1, int col2) {
+	for(int i=0; i<fil1*col1; i++){
+		fscanf(file, "%f", &m1[i]);
+    }
 
+	for(int i=0; i<fil2*col2; i++){
+		fscanf(file, "%f", &m2[i]);
+    }
 
-	/*while(1){
-		printf("Ingrese el numero de filas de la matriz 1: ");
-		scanf("%d",&fil1);
-		printf("Ingrese el numero de columnas de la matriz 1: ");
-		scanf("%d",&col1);
-
-		printf("Ingrese el numero de filas de la matriz 2: ");
-		scanf("%d",&fil2);
-		printf("Ingrese el numero de columnas de la matriz 2: ");
-		scanf("%d",&col2);
-
-		if(col1 == fil2){
-			break;
-		}
-		else{
-			printf("Las matrices de estas dimensiones no se pueden multiplicar!\n\n");
-		}
-	}*/
-	fil1 = 100;
-	col1 = 200;
-	fil2 = 200;
-	col2 = 300;
-	
+	fclose(file);
+}
 
 
-	m1 = (float **)malloc (fil1*sizeof(float *));
-	for (int i=0; i<fil1; i++)
-		m1[i] = (float *) malloc (col1*sizeof(float));
+void MulMatrices(float *m1, float *m2, float *mr, int fil1, int col1, int fil2, int col2){
 
-
-	m2 = (float **)malloc (fil2*sizeof(float *));
-	for (int i=0; i<fil2; i++){
-		m2[i] = (float *) malloc (col2*sizeof(float));
-	}
-
-
-
-	srand(time(NULL));
 	for(int i=0; i<fil1; i++){
-		for(int j=0; j<col1; j++){
-			m1[i][j] = rand(); 
+		for(int j=0; j<col2; j++){
+			int valor = 0;
+			for(int k=0; k<fil2; k++){
+				valor = valor + m1[(i*col1) + k]*m2[(k*col2) + j];
+
+			}
+			mr[(i*col2)+j] = valor;
 		}
 	}
+}
 
-	for(int i=0; i<fil2; i++){
-		for(int j=0; j<col2; j++){
-			m2[i][j] = rand(); 
-		}
+
+int main(int argc, char** argv)
+{
+	if (argc != 2) {
+    	printf("Parametros incorrectos! \n");
+    	return 1;
 	}
 
-	FILE *f = fopen("Matrices.csv", "w");
-	fclose(f);
+	clock_t t_ini, t_fin;
+  	double secs;
+  	t_ini = clock();
 
-	//printf("matriz 1: ----------------------\n"); 
+  	int fil1, col1, fil2, col2;
+	float *m1, *m2, *mr;
 
-	escribirCSV(fil1, col1, m1);
+	FILE *archivo;
+	archivo = fopen(argv[1], "r");
+	fscanf(archivo, "%d %d", &fil1, &col1);
+	fscanf(archivo, "%d %d", &fil2, &col2);
 
-	/*for(int i=0; i<fil1; i++){
-		for(int j=0; j<col1; j++){
-			printf("%f ", m1[i][j]);
-		}
-		printf("\n"); 
-	}*/
-	
+	if (col1 != fil2){
+		printf("No se pueden multiplicar matrices de estas dimensiones!");
+		return 1;
+	}
 
-	//printf("\nmatriz 2: ----------------------\n"); 
+	int size1 = fil1*col1*sizeof(float); //tamaño en bits de cada matriz
+	int size2 = fil2*col2*sizeof(float);
+	int sizer = fil1*col2*sizeof(float);
 
-	escribirCSV(fil2, col2, m2);
+	m1 = (float*)malloc(size1);
+	m2 = (float*)malloc(size2);
+	mr = (float*)malloc(sizer);
 
-	/*for(int i=0; i<fil2; i++){
-		for(int j=0; j<col2; j++){
-			printf("%f ", m2[i][j]);
-		}
-		printf("\n"); 
-	}*/	
+	LeerMatriz(m1, m2, archivo, fil1, fil2, col1, col2);
+	MulMatrices(m1, m2, mr, fil1, col1, fil2, col2);
 
+	EscribirMatriz(fil1, col1, m1);
+	EscribirMatriz(fil2, col2, m2);
+	EscribirMatriz(fil1, col2, mr);
 
-	//printf("\nmatriz 1 + matriz 2: ----------------------\n");*/
-
-	mr = MulMatrices(m1, m2, fil1, col2, fil2);
-
-	escribirCSV(fil1, col2, mr);
-
-	/*for(int i=0; i<fil1; i++){
-		for(int j=0; j<col2; j++){
-			printf("%f ", mr[i][j]);
-		}
-		printf("\n"); 
-	}*/
 	free(m1);
 	free(m2);
 	free(mr);
-}
 
-
-
-
-
-int main()
-{
-	clock_t t_ini, t_fin;
-  	double secs;
-
-  	t_ini = clock();
-  	llenarMatrices();
   	t_fin = clock();
 
   	secs = (double)(t_fin - t_ini) / CLOCKS_PER_SEC;
