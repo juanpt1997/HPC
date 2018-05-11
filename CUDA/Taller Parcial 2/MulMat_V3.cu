@@ -2,82 +2,48 @@
 #include <stdlib.h>
 #include <time.h>
 #include <cuda.h>
-#define TILE_DIM 78
+#define TILE_DIM 32
 
 __global__ void MulMatriz(float *m1, float *m2, float *mr, int fil1, int col1,int fil2, int col2) {
 	
 	int i = blockIdx.y*TILE_DIM + threadIdx.y; // Row
 	int j = blockIdx.x*TILE_DIM + threadIdx.x; // Col
-	
-	int valor = 0;
 
 	__shared__ float m1s[TILE_DIM][TILE_DIM];
-    __shared__ float m2s[TILE_DIM][TILE_DIM];
+	__shared__ float m2s[TILE_DIM][TILE_DIM];
 
-
+	int valor = 0;
+	
     int n = 0, m = 0;
     while(m < gridDim.x && n < gridDim.y){
-		/* De A queremos sacar las columnas, por eso:
-		* j = ( ( m * TILE_DIM ) + threadIdx.x )
-		* j = ( ( blockIdx.x * TILE_DIM ) + threadIdx.x )
-		* Hacemos la comparación entre ambas.
-		* Vemos que m se mueve entre los bloques en el eje x (las columnas)
-		*/
-		if(( ( m * TILE_DIM ) + threadIdx.x ) < col1 && i < fil1) //Si no se pasa
-			m1s[threadIdx.y][threadIdx.x] = m1[ (i * col1) + ( ( m * TILE_DIM ) + threadIdx.x )];//(i*col1 + k), donde k-> 0..fil2 (fil2 = col1)
-		else m1s[threadIdx.y][threadIdx.x] = 0;
 
-		/* De B queremos sacar las filas, por eso:
-		* i = ( ( m * TILE_DIM ) + threadIdx.x )
-		* i = ( ( by * TILE_DIM ) + threadIdx.x )
-		* Hacemos la comparación entre ambas.
-		* Vemos que n se mueve entre los bloques en el eje y (las filas)
-		*/
-		if(( n * TILE_DIM + threadIdx.y) < fil2 && j < col2)
-			m2s[threadIdx.y][threadIdx.x] = m2[( ( n * TILE_DIM + threadIdx.y) * col2 ) + j ];//(k*col2)+Col, donde k-> 0..fil2
-		else m2s[threadIdx.y][threadIdx.x] = 0;
+		if(((m*TILE_DIM) + threadIdx.x)<col1 && i<fil1) {
+			m1s[threadIdx.y][threadIdx.x] = m1[(i*col1) + ((m*TILE_DIM) + threadIdx.x)];
+		}
+		else {
+			m1s[threadIdx.y][threadIdx.x] = 0;
+		}
+		
+		if((n*TILE_DIM + threadIdx.y)<fil2 && j<col2) {
+			m2s[threadIdx.y][threadIdx.x] = m2[((n*TILE_DIM + threadIdx.y)*col2) + j];
+		}
+		else {
+			m2s[threadIdx.y][threadIdx.x] = 0;
+		}
+		m++; 
+		n++;
 
-		m++; n++;
+		__syncthreads();
 
-		__syncthreads();//espera a todos los hilos
-
-		for (int k=0; k < TILE_DIM ; ++k) {
-			valor += m1s[threadIdx.y][k] * m2s[k][threadIdx.x];
+		for (int k=0; k < TILE_DIM ; k++) {
+			valor += m1s[threadIdx.y][k]*m2s[k][threadIdx.x];
 		}
 		__syncthreads();
 	}
-	if(i < fil1 && j < col2)
-		mr[ (i * col2) + j] = valor; //C[filA][col2]
 
-
-
-    /*for (int k = 0; k < (TILE_DIM + col1 - 1)/TILE_DIM; k++) {
-    	
-    	if (k*TILE_DIM + threadIdx.x < col1 && i < fil1){
-        	m1s[threadIdx.y][threadIdx.x] = m1[i*col1 + k*TILE_DIM + threadIdx.x];
-    	}
-        else {
-        	m1s[threadIdx.y][threadIdx.x] = 0.0;
-        }
-
-		if (k*TILE_DIM + threadIdx.y < fil2 && j < col2) {
-        	m2s[threadIdx.y][threadIdx.x] = m2[(k*TILE_DIM + threadIdx.y)*col2 + j];
-		}
-        else{
-        	m2s[threadIdx.y][threadIdx.x] = 0.0;
-        }
-		__syncthreads();
-
-        for (int n = 0; n < TILE_DIM; ++n)
-            valor += m1s[threadIdx.y][n] * m2s[n][threadIdx.x];
-		__syncthreads();
-    }
-
-    if (i < fil1 && j < col2){
-        mr[((blockIdx.y * blockDim.y + threadIdx.y)*col2) + (blockIdx.x * blockDim.x)+ threadIdx.x] = valor;
-    }*/
-
-
+	if(i<fil1 && j<col2) {
+		mr[(i*col2) + j] = valor;
+	}
 }
 
 
@@ -96,7 +62,7 @@ void LeerMatriz(float* m1, float* m2, FILE* file, int fil1, int fil2, int col1, 
 
 __host__
 void EscribirMatriz(int fil, int col, float *m) { 
-	FILE *f = fopen("output.txt", "a"); 
+	FILE *f = fopen("outputSH.txt", "a"); 
 	for(int i=0; i<fil; i++){
 		for(int j=0; j<col; j++){
 			if(j==col-1){
